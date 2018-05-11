@@ -1,0 +1,129 @@
+函数：
+BEGIN
+	DECLARE result INT(11);
+	SELECT count(1) into result FROM ic_circle_usergroup WHERE (guserid=_source_userid OR guserid=_app_userid) and groupid =_groupid and isdel=0;
+	if result=2 then
+	 select 1 into result;
+	 else
+	 select 0 into result;
+	 end if;
+	RETURN result;
+    END
+###############################################################################################################################
+BEGIN
+
+DECLARE result VARCHAR (200);
+
+SELECT
+	b.userHeader
+FROM
+	`ic_circle_usergroup` a
+INNER JOIN ic_user b ON a.guserid = b.`userid`
+WHERE
+	a.groupid = _groupid
+AND a.isdel = 0
+AND b.`isDel` = 0
+AND gidentify NOT IN (3, 4)
+AND a.guserid NOT IN (
+	SELECT
+		userid
+	FROM
+		ic_circle_group
+	WHERE
+		groupid = (
+			SELECT
+				prentgroupid
+			FROM
+				`ic_circlegroupandgroup`
+			WHERE
+				groupid = _groupid
+			LIMIT 1
+		)
+)
+ORDER BY
+	(
+		CASE a.gidentify
+		WHEN 2 THEN
+			10
+		WHEN 1 THEN
+			5
+		ELSE
+			0
+		END
+	) DESC,
+	a.id ASC
+LIMIT _indexno,
+ 1 INTO result;
+
+RETURN result;
+
+
+END
+###############################################################################################################################
+
+BEGIN
+	DECLARE result INT(11);
+	SELECT count(1) into result FROM ic_circle_group_link AS a WHERE (a.srcGroupId= _groupid OR a.targetGroupId=_groupid) AND a.priv_activity=1
+	AND EXISTS(SELECT 1 FROM ic_circle_usergroup WHERE (groupid=a.srcGroupId OR groupid=a.targetGroupId) AND guserid=_userid AND isdel=0 LIMIT 1) limit 1;
+	if result>1 then
+	 select 1 into result;
+	 end if;
+	RETURN result;
+    END	
+###############################################################################################################################
+
+BEGIN
+	DECLARE result int;
+	select count(*) from custom_log where custom_openid=_openid and only_flag = _only_flag and id<=_id INTO result;
+	RETURN result;
+    END
+
+###############################################################################################################################
+
+BEGIN
+DECLARE retval VARCHAR(64);
+SET retval="-999999999,null";
+SELECT concat(CAST(current_value AS CHAR),",",CAST(increment AS CHAR)) INTO retval FROM
+MYCAT_SEQUENCE WHERE name = seq_name;
+RETURN retval;
+END
+
+###############################################################################################################################
+
+BEGIN
+UPDATE MYCAT_SEQUENCE
+SET current_value = current_value + increment WHERE name = seq_name;
+RETURN mycat_seq_currval(seq_name);
+END
+###############################################################################################################################
+
+BEGIN
+UPDATE MYCAT_SEQUENCE
+SET current_value = value
+WHERE name = seq_name;
+RETURN mycat_seq_currval(seq_name);
+END
+###############################################################################################################################
+
+视图：
+CREATE ALGORITHM=UNDEFINED DEFINER=`user3_test`@`%` SQL SECURITY DEFINER VIEW `allgroups` AS select `a`.`groupid` AS `groupid`,`b`.`groupname` AS `groupname`,`a`.`guserid` AS `userid`,`a`.`gidentify` AS `gidentify`,`a`.`isDel` AS `isdel` from (`ic_circle_usergroup` `a` left join `ic_circle_group` `b` on((`a`.`groupid` = `b`.`groupid`))) union all select `a`.`discuss_group_id` AS `groupid`,`b`.`title` AS `groupname`,`a`.`userID` AS `userid`,`a`.`type` AS `gidentify`,`a`.`isdel` AS `isdel` from (`ic_discuss_group` `a` left join `ic_discuss_group_info` `b` on((`a`.`discuss_group_id` = `b`.`discuss_group_id`)))
+
+###############################################################################################################################
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`user3_test`@`%` SQL SECURITY DEFINER VIEW `comm_groups` AS select `a`.`groupid` AS `groupid`,`a`.`itype` AS `itype`,`b`.`prentgroupid` AS `prentgroupid`,`b`.`onegroupid` AS `onegroupid`,`c`.`guserid` AS `guserid` from ((`ic_circle_group` `a` left join `ic_circlegroupandgroup` `b` on((`a`.`groupid` = `b`.`groupid`))) left join `ic_circle_usergroup` `c` on((`a`.`groupid` = `c`.`groupid`))) where ((`a`.`isDel` = 0) and (`b`.`isdel` = 0) and (`c`.`gidentify` = 2) and (`c`.`isDel` = 0) and (`a`.`itype` > 0)) union all select `a`.`groupid` AS `groupid`,`a`.`itype` AS `itype`,'' AS `prentgroupid`,'' AS `onegroupid`,`c`.`guserid` AS `guserid` from (`ic_circle_group` `a` left join `ic_circle_usergroup` `c` on((`a`.`groupid` = `c`.`groupid`))) where ((`a`.`isDel` = 0) and (`c`.`gidentify` = 2) and (`a`.`itype` = 0) and (`c`.`isDel` = 0))
+
+###############################################################################################################################
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`user3_test`@`%` SQL SECURITY DEFINER VIEW `groups` AS select `ic_circle_group`.`userid` AS `userid`,`ic_circle_group`.`groupid` AS `groupid`,`ic_circle_group`.`groupname` AS `groupname`,`ic_circle_group`.`grouphear` AS `groupheader` from `ic_circle_group` where (`ic_circle_group`.`isDel` = 0) union all select `ic_discuss_group_info`.`ownerId` AS `ownerid`,`ic_discuss_group_info`.`discuss_group_id` AS `groupid`,`ic_discuss_group_info`.`title` AS `groupname`,'' AS `groupheader` from `ic_discuss_group_info` where (`ic_discuss_group_info`.`isdel` = 0)
+
+###############################################################################################################################
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`user3_test`@`%` SQL SECURITY DEFINER VIEW `v_liftreportgroup` AS select `ic_circle_group`.`groupid` AS `groupid` from `ic_circle_group` where (`ic_circle_group`.`isDel` = 0) union all select `ic_discuss_group_info`.`discuss_group_id` AS `groupid` from `ic_discuss_group_info` where (`ic_discuss_group_info`.`isdel` = 0)
+
+###############################################################################################################################、
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`user3_test`@`%` SQL SECURITY DEFINER VIEW `v_source` AS select `ic_source`.`id` AS `id`,`ic_source`.`userid` AS `userid` from `ic_source` union select `ic_source`.`id` AS `id`,`ic_source`.`forwarduserid` AS `forwarduserid` from `ic_source` union select `ic_sourcecomments`.`sourceid` AS `sourceid`,`ic_sourcecomments`.`userid` AS `userid` from `ic_sourcecomments` union select `ic_sourcecomments`.`sourceid` AS `sourceid`,`ic_sourcecomments`.`touserid` AS `touserid` from `ic_sourcecomments`
+
+###############################################################################################################################
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`user3_test`@`%` SQL SECURITY DEFINER VIEW `v_userfrigroup` AS select `a`.`id` AS `friendId`,`a`.`userDesc` AS `userDesc`,`a`.`userId` AS `userid`,`a`.`userFrdId` AS `userfrdid`,`a`.`dateline` AS `dateline`,`b`.`userHeader` AS `userfrheader`,`b`.`realName` AS `frrealname`,`b`.`nickname` AS `frnickname`,`a`.`groupId` AS `groupid`,`a`.`rerationshiptype` AS `rerationshiptype`,`a`.`frdname` AS `frdname`,`c`.`groupname` AS `groupname` from ((`ic_userfriend` `a` left join `ic_user` `b` on((`a`.`userFrdId` = `b`.`userID`))) left join `ic_usergroup` `c` on(((`a`.`groupId` = `c`.`id`) and (`a`.`userId` = `c`.`userId`)))) where (`a`.`isdel` = 0) order by `a`.`dateline` desc
